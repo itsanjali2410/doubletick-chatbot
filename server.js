@@ -35,8 +35,11 @@ app.post('/webhook', async (req, res) => {
     console.log("✅ WhatsApp sent:", result);
     res.send("OK");
   } catch (error) {
-    console.error("❌ Failed to send message:", error.response?.data || error.message);
-    res.status(500).send("Error sending WhatsApp message");
+    console.error("❌ WhatsApp Error:", error?.response?.data || error.message);
+    res.status(500).json({
+      error: "Failed to send WhatsApp message",
+      details: error?.response?.data || error.message
+    });
   }
 });
 
