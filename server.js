@@ -1,17 +1,24 @@
 const express = require('express');
 const axios = require('axios');
 require('dotenv').config();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Replace with your DoubleTick API Key
 const DOUBLE_TICK_API_KEY = process.env.DOUBLETICK_API_KEY;
 
 app.post('/webhook', async (req, res) => {
+  console.log("📩 Webhook triggered!");
+  console.log(JSON.stringify(req.body, null, 2));
+
   const { phone, message } = req.body;
-  console.log(`Received: ${message} from ${phone}`);
+
+  if (!phone || !message) {
+    console.error("❌ Missing 'phone' or 'message' in webhook payload");
+    return res.sendStatus(400);
+  }
 
   const reply = getCustomReply(message);
 
@@ -46,23 +53,26 @@ function getCustomReply(message) {
 
 async function sendWhatsAppMessage(phone, message) {
   try {
-    await axios.post('https://app.doubletick.io/api/send', {
-      phone,
+    const response = await axios.post('https://app.doubletick.io/api/send', {
+      number: phone,
+      type: 'text',
       message
     }, {
       headers: {
-        Authorization: `Bearer ${DOUBLETICK_API_KEY}`
+        apiKey: DOUBLE_TICK_API_KEY,
+        'Content-Type': 'application/json'
       }
     });
-    console.log(`Replied to ${phone}: ${message}`);
+    console.log(`✅ Replied to ${phone}: ${message}`);
   } catch (error) {
-    console.error('Error sending message:', error.message);
+    console.error('❌ Error sending message:', error.response?.data || error.message);
   }
 }
+
 app.get('/', (req, res) => {
   res.send('✅ Bot is running');
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
