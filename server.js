@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const { v4: uuidv4 } = require('uuid'); // ✅ import uuidv4
 require('dotenv').config();
 
 const app = express();
@@ -8,7 +9,9 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 const DOUBLE_TICK_API_KEY = process.env.DOUBLETICK_API_KEY;
+const FROM_NUMBER = process.env.DOUBLETICK_FROM_NUMBER; // ✅ Add this in .env
 
+// Webhook to handle incoming messages
 app.post('/webhook', async (req, res) => {
   console.log("📩 Webhook triggered!");
   console.log(JSON.stringify(req.body, null, 2));
@@ -23,12 +26,18 @@ app.post('/webhook', async (req, res) => {
   const reply = getCustomReply(message);
 
   if (reply) {
-    await sendWhatsAppMessage(phone, reply);
+    try {
+      await sendWhatsAppMessage(phone, reply);
+      console.log(`✅ Replied to ${phone} with: ${reply}`);
+    } catch (error) {
+      console.error('❌ Failed to send message:', error.response?.data || error.message);
+    }
   }
 
   res.sendStatus(200);
 });
 
+// Custom rule-based replies
 function getCustomReply(message) {
   const text = message.trim().toLowerCase();
 
@@ -51,22 +60,24 @@ function getCustomReply(message) {
   return "Sorry, I didn't understand. Please type a destination or say 'help'.";
 }
 
-async function sendWhatsAppMessage(phone, message) {
-  try {
-    const response = await axios.post('https://app.doubletick.io/api/send', {
-      number: phone,
-      type: 'text',
-      message
-    }, {
-      headers: {
-        apiKey: DOUBLE_TICK_API_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
-    console.log(`✅ Replied to ${phone}: ${message}`);
-  } catch (error) {
-    console.error('❌ Error sending message:', error.response?.data || error.message);
-  }
+// ✅ Function to send message using DoubleTick API
+async function sendWhatsAppMessage(to, message) {
+  const response = await axios.post('https://public.doubletick.io/whatsapp/message/text', {
+    from: FROM_NUMBER,
+    to: to,
+    messageId: uuidv4(),
+    content: {
+      type: "text",
+      text: message
+    }
+  }, {
+    headers: {
+      'Authorization': `Bearer ${DOUBLE_TICK_API_KEY}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  return response.data;
 }
 
 app.get('/', (req, res) => {
