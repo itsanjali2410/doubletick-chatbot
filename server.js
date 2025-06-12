@@ -59,6 +59,9 @@ async function sendWhatsAppMessage(phone, message) {
     console.error('Error sending message:', error.message);
   }
 }
+app.get('/', (req, res) => {
+  res.send('✅ Bot is running');
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
