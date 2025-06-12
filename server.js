@@ -64,7 +64,7 @@ function getCustomReply(message) {
 
 // ✅ Function to send message using DoubleTick API
 async function sendWhatsAppMessage(to, message) {
-  const response = await axios.post('https://public.doubletick.io/whatsapp/message/text', {
+  const response = await axios.post('https://public.doubletick.io/whatsapp/message/template', {
     from: FROM_NUMBER,
     to: to,
     messageId: uuidv4(),
