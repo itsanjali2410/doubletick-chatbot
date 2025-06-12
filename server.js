@@ -2,6 +2,8 @@ const express = require('express');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid'); // ✅ import uuidv4
 require('dotenv').config();
+console.log("API KEY Loaded:", process.env.DOUBLETICK_API_KEY);
+console.log("FROM Number Loaded:", process.env.DOUBLETICK_FROM_NUMBER);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -72,7 +74,7 @@ async function sendWhatsAppMessage(to, message) {
     }
   }, {
     headers: {
-      'Authorization': `Bearer ${DOUBLE_TICK_API_KEY}`,
+      'Authorization': `Bearer ${DOUBLETICK_API_KEY}`,
       'Content-Type': 'application/json'
     }
   });
