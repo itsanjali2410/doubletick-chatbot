@@ -1,97 +1,61 @@
-const express = require('express');
-const axios = require('axios');
-const { v4: uuidv4 } = require('uuid');
-require('dotenv').config();
-
-console.log("API KEY Loaded:", process.env.DOUBLETICK_API_KEY);
-console.log("FROM Number Loaded:", process.env.DOUBLETICK_FROM_NUMBER);
+const express = require("express");
+const bodyParser = require("body-parser");
+const axios = require("axios");
+require("dotenv").config();
 
 const app = express();
+app.use(bodyParser.json());
+
 const PORT = process.env.PORT || 3000;
+const userStates = {}; // Replace with Redis or DB in production
 
-app.use(express.json());
+// Function to send a WhatsApp message
+async function sendMessage(phone, message) {
+  try {
+    await axios.post("https://public.doubletick.io/whatsapp/message/text", {
+      phone,
+      message,
+    }, {
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+        "x-api-key": process.env.DOUBLETICK_API_KEY
+      }
+    });
+  } catch (error) {
+    console.error("Message send failed:", error.message);
+  }
+}
 
-const DOUBLE_TICK_API_KEY = process.env.DOUBLETICK_API_KEY;
-const FROM_NUMBER = process.env.DOUBLETICK_FROM_NUMBER;
-
-// Webhook to handle incoming messages
-app.post('/webhook', async (req, res) => {
-  console.log("📩 Webhook triggered!");
-  console.log("🧾 Headers:", req.headers);
-  console.log("🧾 Body:", req.body);
-
+// Webhook endpoint
+app.post("/webhook", async (req, res) => {
   const { phone, message } = req.body;
 
-  if (!phone || !message) {
-    console.error("❌ Missing phone or message!");
-    return res.sendStatus(400);
-  }
+  const user = userStates[phone] || {};
 
-  const reply = getCustomReply(message);
-  console.log("📨 Reply to send:", reply);
+  if (!user.step) {
+    await sendMessage(phone, "Hi! What is your travel destination?");
+    userStates[phone] = { step: "location" };
+  } else if (user.step === "location") {
+    userStates[phone] = { ...user, location: message, step: "date" };
+    await sendMessage(phone, "Great! What’s your travel date?");
+  } else if (user.step === "date") {
+    userStates[phone] = { ...user, date: message, step: "passengers" };
+    await sendMessage(phone, "How many passengers?");
+  } else if (user.step === "passengers") {
+    userStates[phone] = { ...user, passengers: message, step: "done" };
 
-  try {
-    const result = await sendWhatsAppMessage(phone, reply);
-    console.log("✅ WhatsApp sent:", result);
-    res.send("OK");
-  } catch (error) {
-    console.error("❌ WhatsApp Error:", error?.response?.data || error.message);
-    res.status(500).json({
-      error: "Failed to send WhatsApp message",
-      details: error?.response?.data || error.message
-    });
-  }
-});
-
-// Custom rule-based replies
-function getCustomReply(message) {
-  const text = message.trim().toLowerCase();
-
-  if (text.includes('hi') || text.includes('hello')) {
-    return 'Hi there! 👋 How can I assist you today?';
-  }
-  if (text.includes('bali')) {
-    return '🌴 Bali packages start from ₹49,999. Would you like an itinerary?';
-  }
-  if (text.includes('vietnam')) {
-    return '🇻🇳 Vietnam is a beautiful destination! Tell us your travel dates.';
-  }
-  if (text.includes('price')) {
-    return 'Prices vary by date and location. Where would you like to go?';
-  }
-  if (text.includes('help')) {
-    return 'You can ask me about Bali, Vietnam, prices, or say hello!';
-  }
-
-  return "Sorry, I didn't understand. Please type a destination or say 'help'.";
-}
-
-// ✅ Send custom WhatsApp text message (not a template)
-async function sendWhatsAppMessage(to, message) {
-  const payload = {
-    from: FROM_NUMBER,
-    to: to.startsWith('+') ? to : `+${to}`,
-    messageId: uuidv4(),
-    content: {
-      type: "text",
-      text: message
+    const { location } = userStates[phone];
+    if (location.toLowerCase() === "bali") {
+      await sendMessage(phone, "🌴 Here’s your Bali itinerary: https://yourdomain.com/bali-itinerary.pdf\n💰 Budget: ₹50,000 per person.");
+    } else {
+      await sendMessage(phone, `Thanks! We'll prepare your itinerary for ${location} and share it soon.`);
     }
-  };
+  }
 
-  const response = await axios.post('https://public.doubletick.io/whatsapp/message/text', payload, {
-    headers: {
-      'Authorization': `Bearer ${DOUBLE_TICK_API_KEY}`,
-      'Content-Type': 'application/json'
-    }
-  });
-
-  return response.data;
-}
-
-app.get('/', (req, res) => {
-  res.send('✅ Bot is running');
+  res.sendStatus(200);
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on ${PORT}`);
+  console.log(`Bot running on port ${PORT}`);
 });
