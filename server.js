@@ -1,7 +1,8 @@
 const express = require('express');
 const axios = require('axios');
-const { v4: uuidv4 } = require('uuid'); // ✅ import uuidv4
+const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
+
 console.log("API KEY Loaded:", process.env.DOUBLETICK_API_KEY);
 console.log("FROM Number Loaded:", process.env.DOUBLETICK_FROM_NUMBER);
 
@@ -11,32 +12,32 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 const DOUBLE_TICK_API_KEY = process.env.DOUBLETICK_API_KEY;
-const FROM_NUMBER = process.env.DOUBLETICK_FROM_NUMBER; // ✅ Add this in .env
+const FROM_NUMBER = process.env.DOUBLETICK_FROM_NUMBER;
 
 // Webhook to handle incoming messages
 app.post('/webhook', async (req, res) => {
   console.log("📩 Webhook triggered!");
-  console.log(JSON.stringify(req.body, null, 2));
+  console.log("🧾 Headers:", req.headers);
+  console.log("🧾 Body:", req.body);
 
   const { phone, message } = req.body;
 
   if (!phone || !message) {
-    console.error("❌ Missing 'phone' or 'message' in webhook payload");
+    console.error("❌ Missing phone or message!");
     return res.sendStatus(400);
   }
 
   const reply = getCustomReply(message);
+  console.log("📨 Reply to send:", reply);
 
-  if (reply) {
-    try {
-      await sendWhatsAppMessage(phone, reply);
-      console.log(`✅ Replied to ${phone} with: ${reply}`);
-    } catch (error) {
-      console.error('❌ Failed to send message:', error.response?.data || error.message);
-    }
+  try {
+    const result = await sendWhatsAppMessage(phone, reply);
+    console.log("✅ WhatsApp sent:", result);
+    res.send("OK");
+  } catch (error) {
+    console.error("❌ Failed to send message:", error.response?.data || error.message);
+    res.status(500).send("Error sending WhatsApp message");
   }
-
-  res.sendStatus(200);
 });
 
 // Custom rule-based replies
@@ -62,19 +63,21 @@ function getCustomReply(message) {
   return "Sorry, I didn't understand. Please type a destination or say 'help'.";
 }
 
-// ✅ Function to send message using DoubleTick API
+// ✅ Send custom WhatsApp text message (not a template)
 async function sendWhatsAppMessage(to, message) {
-  const response = await axios.post('https://public.doubletick.io/whatsapp/message/template', {
+  const payload = {
     from: FROM_NUMBER,
-    to: to,
+    to: to.startsWith('+') ? to : `+${to}`,
     messageId: uuidv4(),
     content: {
       type: "text",
       text: message
     }
-  }, {
+  };
+
+  const response = await axios.post('https://public.doubletick.io/whatsapp/message/text', payload, {
     headers: {
-      'Authorization': `Bearer ${DOUBLETICK_API_KEY}`,
+      'Authorization': `Bearer ${DOUBLE_TICK_API_KEY}`,
       'Content-Type': 'application/json'
     }
   });
